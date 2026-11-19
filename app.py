@@ -1,5 +1,6 @@
 """StudentGuard AI – Streamlit entry point. Run:  streamlit run app.py"""
 import json
+import os
 from types import SimpleNamespace
 
 import streamlit as st
@@ -11,13 +12,13 @@ from src.database import Database
 
 st.set_page_config(page_title=config.APP_TITLE, page_icon="🛡️", layout="wide")
 
-from views import (administrator_dashboard, counselling_requests, counsellor_dashboard,  # noqa: E402
-                   model_performance, progress_trends, risk_assessment, student_dashboard, ui)
+from views import (academic_model, administrator_dashboard, counselling_requests, counsellor_dashboard,  # noqa: E402
+                   model_performance, profile, progress_trends, risk_assessment, student_dashboard, theme, ui, welcome)
 
 
 @st.cache_resource
-def get_db():
-    db = Database()
+def get_db(path):
+    db = Database(path)
     return db
 
 
@@ -27,7 +28,7 @@ def get_bundle():
 
 
 def bootstrap():
-    db, bundle = get_db(), get_bundle()
+    db, bundle = get_db(os.environ.get("STUDENTGUARD_DB", str(config.DB_PATH))), get_bundle()
     if db.user_count() == 0:
         try:
             seed.seed_demo_data(db, bundle)
@@ -41,43 +42,31 @@ def bootstrap():
     return db, bundle
 
 
-def login_screen(db):
-    ui.hero()
-    st.warning("Prototype with DEMO authentication — do not enter real student data. See README for limitations.")
-    c1, c2 = st.columns([1, 1])
-    with c1:
-        with st.form("login"):
-            st.markdown("### Sign in")
-            u = st.text_input("Username")
-            p = st.text_input("Password", type="password")
-            if st.form_submit_button("Sign in", type="primary"):
-                user = db.authenticate(u, p)
-                if user:
-                    st.session_state["user"] = user
-                    st.rerun()
-                else:
-                    st.error("Invalid username or password.")
-    with c2:
-        st.markdown("### Demo accounts (synthetic data)")
-        st.table({"Role": ["Student", "Counsellor", "Administrator"],
-                  "Username": ["student1 (also student2, student3)", "counsellor", "admin"],
-                  "Password": ["student123", "counsel123", "admin123"]})
-        st.caption("Shown only because this is a classroom demo.")
-    ui.emergency_note()
-
-
 def main():
+    theme.apply()
     ui.inject_css()
     db, bundle = bootstrap()
-    user = st.session_state.get("user")
+    mode = predict.mode_of(bundle)
+    signed_in = st.session_state.get("user")
+    user = db.active_user(signed_in["user_id"]) if signed_in else None
     if not user:
-        login_screen(db)
+        st.session_state.pop("user", None)
+        brand, appearance = st.columns([4, 1])
+        brand.html('<div class="sg-wordmark">STUDENTGUARD AI</div>')
+        with appearance:
+            theme.toggle()
+        ui.mode_banner(mode)
+        ui.advisory()
+        if st.session_state.get("sg_screen") == "auth":
+            welcome.authentication(db)
+        else:
+            welcome.landing()
         return
-    ctx = SimpleNamespace(db=db, bundle=bundle, user=user, mode=predict.mode_of(bundle))
+    st.session_state["user"] = user
+    ctx = SimpleNamespace(db=db, bundle=bundle, user=user, mode=mode)
 
     def page(fn, name):
         def _p():
-            ui.hero()
             fn(ctx)
         _p.__name__ = name
         return _p
@@ -101,15 +90,28 @@ def main():
             st.Page(page(model_performance.render, "model"), title="Model Performance", icon="📈", url_path="model"),
             st.Page(page(administrator_dashboard.render_settings, "settings"), title="Settings", icon="⚙️", url_path="settings"),
         ]
+    if role in ("counsellor", "administrator", "admin"):
+        pages.append(st.Page(page(academic_model.render, "academic_lab"),
+                             title="Academic Model Lab", icon="🎓", url_path="academic_lab"))
+    pages.insert(0, st.Page(page(profile.render, "my_profile"), title="My Profile", icon=":material/person:", default=True))
     nav = st.navigation(pages)
+    if st.session_state["sg_theme"] != "dark" and "theme" not in st.query_params:
+        st.query_params["theme"] = st.session_state["sg_theme"]
     with st.sidebar:
-        st.markdown(f"**{user['display_name']}**  \n_{role}_")
+        st.html('<div class="sg-wordmark">STUDENTGUARD AI</div>')
+        st.text(user["display_name"])
+        st.caption(profile.ROLE_LABELS[role])
+        theme.toggle()
         if st.button("Sign out"):
+            appearance = st.session_state["sg_theme"]
             st.session_state.clear()
+            st.session_state["sg_theme"] = appearance
             st.rerun()
         st.divider()
         st.caption(config.ADVISORY_NOTICE)
         st.caption("Privacy: access is role-based; private messages are visible only to authorised counsellors.")
+    ui.mode_banner(mode)
+    ui.advisory()
     nav.run()
 
 

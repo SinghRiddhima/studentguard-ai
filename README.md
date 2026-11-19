@@ -34,20 +34,36 @@ tests/ test_risk_zones · test_interventions · test_database · test_pipeline �
 data/  synthetic CSVs + README      models/  model.joblib, metrics.json (created by training)
 ```
 
-## Install & run
-```bash
-python -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-python -m src.generate_synthetic_data   # optional: CSVs are already included
-python -m src.train_model               # creates models/model.joblib + metrics.json (synthetic demo model)
-streamlit run app.py
-python -m pytest -q                     # run the tests
-```
-The database (`studentguard.db`) is created and seeded with synthetic data automatically on first launch.
-The app also works if no model exists (rule-based demo mode). Delete `studentguard.db` to reset.
+## Install and run in Windows PowerShell
 
-**Demo logins:** `student1/student123` (also student2, student3) · `counsellor/counsel123` · `admin/admin123`
+Extract the ZIP and open PowerShell in the inner `studentguard-ai` folder that contains `app.py`. Use Python 3.12.
+
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m streamlit run app.py
+```
+
+Open `http://localhost:8501`. These commands use the virtual environment directly, so PowerShell activation is optional.
+On macOS or Linux, use `python3.12 -m venv .venv` and replace `.\.venv\Scripts\python.exe` with `.venv/bin/python`.
+Run `python -m pytest -q` with the same virtual environment's Python. The included model uses scikit-learn 1.8.0.
+To retrain it on the included synthetic CSV, run `python -m src.train_model` with the same Python.
+
+The app creates and seeds `studentguard.db` on first launch. To carry your v2 demo history forward, stop the
+old app and copy its SQLite database next to the new `app.py` before launching. Back it up first.
+Fresh starts can use a new database and the bundled synthetic data.
+
+## Redesigned demo
+
+Open **Enter StudentGuard**, then sign in as `student1` / `student123`, `counsellor` / `counsel123`,
+or `admin` / `admin123`. Each role opens its own **My Profile** page. Profiles support editing
+the display name and uploading or removing a photo. The sidebar links to each role’s existing tools.
+Dark is the default. The theme selector stores its setting in the current URL so a reload can restore it.
+Signing in is scoped to the Streamlit session.
+
+To create a new student, sign in as admin, go to **Settings → Student invitations** and generate
+a code. Then sign out and use the **Student sign-up** tab. A code is valid for one account for 24 hours.
+Use fictional names and images for the classroom demo.
 
 ## Demo walkthrough (presentation)
 1. Student1 → press **SOS**, submit → note the request ID. 2. Sign out; counsellor → *SOS Requests* → acknowledge → schedule → resolve.
@@ -110,3 +126,28 @@ in aggregates; no automatic penalties; synthetic rows flagged `is_synthetic`.
 ## Future improvements
 Collect verified outcome labels (e.g. enrolment status after 6–12 months) with consent; validate/calibrate thresholds;
 fairness checks; SSO + encryption; email/SMS notifications; consent management; longitudinal tracking.
+
+## Release audit
+
+| # | Check | Verification |
+|---|---|---|
+| 1 | Welcome copy and landing route | AppTest |
+| 2 | Orbital artwork | Implemented in CSS |
+| 3 | Dark default and light control | AppTest checks toggle and URL state |
+| 4 | Theme on browser reload, including initial paint | Browser check pending |
+| 5 | Mobile layout and menu | Browser check pending |
+| 6 | Keyboard focus, contrast and screen reader navigation | Accessibility audit pending |
+| 7 | Reduced motion | CSS media query in place; browser check pending |
+| 8 | Sign-in for all three roles | AppTest |
+| 9 | Student invitation and one-time use | AppTest and SQLite |
+| 10 | Personal profile as the first page after sign-in | AppTest for each role |
+| 11 | Display-name persistence | AppTest |
+| 12 | Avatar upload and removal | Image processing and SQLite tested; browser upload check pending |
+| 13 | Sign-out | AppTest |
+| 14 | Direct SOS submission from a profile | AppTest |
+| 15 | Check-in lock, progress and service feedback | AppTest and SQLite |
+| 16 | Human decisions and audit trail | SQLite tests |
+| 17 | Demonstration risk scoring and explanation | Pipeline and unit tests |
+
+The browser checks cover the remaining visual work, including native widget styling in light mode.
+Authentication uses Streamlit sessions. This build has no persistent sign-in cookie or password reset.

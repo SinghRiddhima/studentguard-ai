@@ -1,0 +1,178 @@
+{
+  "purpose": "UCI academic research benchmark; not a StudentGuard survey model",
+  "prediction_time": "End of first semester",
+  "source": "https://doi.org/10.24432/C5MC89",
+  "license": "CC BY 4.0",
+  "source_sha256": "3ef126de5cefff26eb11fbb4237f1a1401cb64b488e2f1d598c23cedeb4c45ae",
+  "sklearn_version": "1.8.0",
+  "source_class_counts": {
+    "Graduate": 2209,
+    "Dropout": 1421,
+    "Enrolled": 794
+  },
+  "exact_duplicates_removed": 0,
+  "label_mapping": {
+    "Graduate": 0,
+    "Dropout": 1
+  },
+  "excluded_label": "Enrolled (unresolved final outcome)",
+  "features": [
+    "Admission grade",
+    "Previous qualification (grade)",
+    "Curricular units 1st sem (credited)",
+    "Curricular units 1st sem (enrolled)",
+    "Curricular units 1st sem (evaluations)",
+    "Curricular units 1st sem (approved)",
+    "Curricular units 1st sem (grade)",
+    "Curricular units 1st sem (without evaluations)"
+  ],
+  "selected_model": "Random Forest",
+  "selection_metric": "Training CV F1",
+  "train_rows": 2904,
+  "test_rows": 726,
+  "test_dropout_count": 284,
+  "seed": 42,
+  "confusion_matrix_order": "Rows=actual, columns=predicted; [Graduate, Dropout]",
+  "threshold": 0.5,
+  "calibrated": false,
+  "limitations": [
+    "Evaluation is conditional on resolved Dropout/Graduate outcomes; Enrolled is excluded.",
+    "One institution and a random holdout; no validation on your college or future cohorts.",
+    "No attendance percentage or survey stress/motivation inputs are available.",
+    "Probabilities and green/yellow/red thresholds are not validated for deployment.",
+    "Source has no student identifiers to independently verify student-disjoint partitions."
+  ],
+  "results": {
+    "Logistic Regression": {
+      "cv": {
+        "precision": {
+          "mean": 0.8145110137054008,
+          "std": 0.007390018634558808
+        },
+        "recall": {
+          "mean": 0.7959734137104878,
+          "std": 0.02418821150393201
+        },
+        "f1": {
+          "mean": 0.8050054286852072,
+          "std": 0.015007783568608553
+        },
+        "roc_auc": {
+          "mean": 0.9043979550168135,
+          "std": 0.010814815110756918
+        }
+      },
+      "test": {
+        "accuracy": 0.8471074380165289,
+        "precision": 0.7873754152823921,
+        "recall": 0.8345070422535211,
+        "f1": 0.8102564102564103,
+        "roc_auc": 0.9138598559683896,
+        "confusion_matrix": [
+          [
+            378,
+            64
+          ],
+          [
+            47,
+            237
+          ]
+        ]
+      }
+    },
+    "Decision Tree": {
+      "cv": {
+        "precision": {
+          "mean": 0.8103242200733833,
+          "std": 0.01250906582457529
+        },
+        "recall": {
+          "mean": 0.7642630806090115,
+          "std": 0.02660337674796514
+        },
+        "f1": {
+          "mean": 0.7862121657885855,
+          "std": 0.012103013890986112
+        },
+        "roc_auc": {
+          "mean": 0.8792710715566923,
+          "std": 0.00765762255914302
+        }
+      },
+      "test": {
+        "accuracy": 0.8526170798898072,
+        "precision": 0.8105263157894737,
+        "recall": 0.8133802816901409,
+        "f1": 0.81195079086116,
+        "roc_auc": 0.8997872984513415,
+        "confusion_matrix": [
+          [
+            388,
+            54
+          ],
+          [
+            53,
+            231
+          ]
+        ]
+      }
+    },
+    "Random Forest": {
+      "cv": {
+        "precision": {
+          "mean": 0.8523413556651992,
+          "std": 0.01956462741412395
+        },
+        "recall": {
+          "mean": 0.7748357678336812,
+          "std": 0.03562853202840525
+        },
+        "f1": {
+          "mean": 0.8112679535213466,
+          "std": 0.022778178267460588
+        },
+        "roc_auc": {
+          "mean": 0.9044993246692646,
+          "std": 0.011461775368672445
+        }
+      },
+      "test": {
+        "accuracy": 0.8636363636363636,
+        "precision": 0.8291814946619217,
+        "recall": 0.8204225352112676,
+        "f1": 0.8247787610619469,
+        "roc_auc": 0.9189344210056719,
+        "confusion_matrix": [
+          [
+            394,
+            48
+          ],
+          [
+            51,
+            233
+          ]
+        ]
+      }
+    },
+    "Majority baseline": {
+      "cv": null,
+      "test": {
+        "accuracy": 0.6088154269972452,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "roc_auc": 0.5,
+        "confusion_matrix": [
+          [
+            442,
+            0
+          ],
+          [
+            284,
+            0
+          ]
+        ]
+      }
+    }
+  }
+}
