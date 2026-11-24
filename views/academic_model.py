@@ -77,6 +77,27 @@ def render(ctx):
         st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
     st.caption('Positive class = Dropout. Enrolled records were excluded because their final '
                'outcomes were unresolved; the comparison is Dropout versus Graduate only.')
+    with st.expander('Dataset counts and prediction errors', expanded=True):
+        counts = metadata.get('source_class_counts', {})
+        if counts:
+            st.dataframe(pd.DataFrame([
+                {'Recorded outcome': label, 'Records': count,
+                 'Used for training/testing': label != 'Enrolled'}
+                for label, count in counts.items()
+            ]), hide_index=True, use_container_width=True)
+        result = metadata.get('results', {}).get(selected, {}).get('test', {})
+        matrix = result.get('confusion_matrix')
+        if matrix is not None:
+            st.write(f'Confusion matrix — {selected}')
+            st.dataframe(pd.DataFrame(matrix,
+                index=['Actually Graduate', 'Actually Dropout'],
+                columns=['Predicted Graduate', 'Predicted Dropout']), use_container_width=True)
+            tn, fp = matrix[0]
+            fn, tp = matrix[1]
+            st.caption(f'{tp} dropout cases identified; {fn} missed. '
+                       f'{fp} graduates incorrectly flagged; {tn} correctly classified.')
+        st.caption('These are held-out results from the source institution, not an evaluation '
+                   'on students at your college. The survey and academic models use different inputs.')
     st.subheader('Try an academic example')
     st.write('Use the source grading scales below. Defaults are an illustrative example. '
              'Do not enter CGPA or percentages directly into grade fields with a different scale.')

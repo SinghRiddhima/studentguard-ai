@@ -3,7 +3,7 @@ import streamlit as st
 
 PALETTES = {
     "dark": ("#08090D", "#141722", "#252938", "#F5F7FF", "#B5BCD2", "#9B5CFF", "#42E8FF", "#FF4FD8"),
-    "light": ("#F7F8FC", "#FFFFFF", "#E4E7F0", "#171824", "#535B70", "#7546E8", "#078DA8", "#B42996"),
+    "light": ("#F3F5F9", "#FFFFFF", "#D9DFE9", "#253047", "#526078", "#7546E8", "#078DA8", "#B42996"),
 }
 
 
@@ -75,6 +75,23 @@ def apply():
       html:has(.sg-shell) * {scroll-behavior:auto !important;}
     }
     """
+    # Apply typography only to light mode; preserve the existing dark presentation.
+    if choice == "light":
+        layout += """
+        [data-testid="stApp"] {font-size:17px; font-weight:500; line-height:1.65;}
+        [data-testid="stApp"] [data-testid="stMarkdownContainer"] :is(p,li),
+        [data-testid="stApp"] :is(input,textarea,[data-baseweb="select"]),
+        [data-baseweb="popover"] [role="option"] {font-size:1.0625rem; font-weight:500; line-height:1.65;}
+        [data-testid="stApp"] [data-testid="stWidgetLabel"] p,
+        [data-testid="stApp"] button p,
+        [data-testid="stSidebarNav"] a span {font-size:1rem; font-weight:600;}
+        [data-testid="stApp"] [data-testid="stCaptionContainer"] p,
+        [data-testid="stApp"] .sg-metric .l {font-size:.9375rem; font-weight:500; color:var(--sg-muted);}
+        [data-testid="stApp"] :is(h1,h2,h3,h4) {font-weight:700; line-height:1.25;}
+        [data-testid="stApp"] .sg-hero h1 {color:#fff;}
+        [data-testid="stApp"] .sg-eyebrow {font-size:.8125rem;}
+        [data-testid="stApp"] [role="tab"][aria-selected="true"] {color:var(--sg-violet); font-weight:700;}
+        """
     tokens = f"""
     :root {{ --sg-bg:{bg}; --sg-surface:{surface}; --sg-border:{border};
       --sg-text:{text}; --sg-muted:{muted}; --sg-violet:{violet}; --sg-cyan:{cyan};

@@ -8,7 +8,7 @@ from views import ui
 
 def outcome_charts(summary: dict, key: str):
     if not summary["n_with_support"]:
-        st.info("No students with recorded support and follow-up assessments yet.")
+        st.caption("No students with recorded support and follow-up assessments yet.")
         return
     c1, c2 = st.columns(2)
     with c1:
@@ -26,7 +26,7 @@ def outcome_charts(summary: dict, key: str):
 
 def feedback_charts(stats: dict, key: str):
     if not stats["n"]:
-        st.info("No service feedback yet.")
+        st.caption("No service feedback yet.")
         return
     st.write(f"**{stats['n']}** feedback response(s) from **{stats['resolved_requests']}** resolved request(s).")
     a = stats["averages"]

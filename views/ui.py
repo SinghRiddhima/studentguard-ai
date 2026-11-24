@@ -38,6 +38,14 @@ def hero():
                 unsafe_allow_html=True)
 
 
+def about(mode: str):
+    """Keep model context available without recurring dashboard banners."""
+    st.caption(config.DEMO_BANNER if mode == "DEMONSTRATION" else
+               "Trained model mode. See Model Performance for validation details and limits.")
+    st.caption(config.ADVISORY_NOTICE)
+    st.caption("Privacy: access is role-based; private messages are visible only to authorised counsellors.")
+
+
 def mode_banner(mode: str):
     if mode == "DEMONSTRATION":
         st.markdown(f"<div class='sg-banner-demo'>⚠️ {html.escape(config.DEMO_BANNER)}</div>", unsafe_allow_html=True)
@@ -51,7 +59,7 @@ def advisory():
 
 
 def emergency_note():
-    st.markdown(f"<div class='sg-emergency'>🚨 {html.escape(config.EMERGENCY_NOTE)}</div>", unsafe_allow_html=True)
+    st.caption(config.EMERGENCY_NOTE)
 
 
 def zone_badge(zone: str, short=False) -> str:
@@ -79,7 +87,7 @@ def plotly_chart(figure, **options):
     bg, _, border, text, _, violet, cyan, magenta = PALETTES[appearance]
     figure.update_layout(
         template="plotly_dark" if appearance == "dark" else "plotly_white",
-        paper_bgcolor=bg, plot_bgcolor=bg, font_color=text,
+        paper_bgcolor=bg, plot_bgcolor=bg, font_color=text, font_size=15 if appearance == "light" else 12,
         colorway=[violet, cyan, magenta, "#64748b"],
         xaxis_gridcolor=border, yaxis_gridcolor=border,
     )

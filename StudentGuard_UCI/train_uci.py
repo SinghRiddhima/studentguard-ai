@@ -1,5 +1,5 @@
 """Standalone UCI academic benchmark; not compatible with the survey app model.
-Run: python train_uci.py --data data/uci_dropout.csv
+Run from the project root: python StudentGuard_UCI/train_uci.py
 """
 import argparse
 import hashlib
@@ -35,8 +35,8 @@ FEATURES = [
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--data', type=Path, default=Path('data/uci_dropout.csv'))
-    parser.add_argument('--out', type=Path, default=Path('uci_results'))
+    parser.add_argument('--data', type=Path, default=Path(__file__).resolve().parent / 'data' / 'uci_dropout.csv')
+    parser.add_argument('--out', type=Path, default=Path(__file__).resolve().parents[1] / 'StudentGuard_UCI_results')
     args = parser.parse_args()
     df = pd.read_csv(args.data, sep=';')
     df.columns = df.columns.str.strip()

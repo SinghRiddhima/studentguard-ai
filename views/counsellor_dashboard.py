@@ -18,13 +18,13 @@ def render_overview(ctx):
         if sum(dist.values()):
             ui.zone_pie(dist)
         else:
-            st.info("No assessments yet. Use *Student Risk Assessment* to add one.")
+            st.caption("No assessments yet. Use *Student Risk Assessment* to add one.")
     with c2:
         sos = db.sos_stats(user)
         st.markdown("**Counselling requests by status**")
         st.bar_chart(pd.Series(sos["by_status"]))
         pending = sos["by_status"]["Submitted"]
-        st.write(f"🔔 **{pending}** request(s) awaiting acknowledgement. _Nothing alerts you automatically — check this queue._")
+        st.write(f"**{pending}** request(s) awaiting acknowledgement.")
         ist = db.intervention_stats(user)
         st.write("**Human decisions on AI suggestions:** " +
                  ", ".join(f"{k}: {v}" for k, v in ist["by_decision"].items()))
@@ -36,7 +36,7 @@ def render_overview(ctx):
                      hide_index=True, width="stretch")
         flagged = df[df["intent_flag"] == 1]
         if len(flagged):
-            st.warning(f"{len(flagged)} student(s) self-reported serious consideration of discontinuing in their latest check-in "
+            st.write(f"**Priority follow-up:** {len(flagged)} student(s) self-reported serious consideration of discontinuing in their latest check-in "
                        "(see Progress & Trends → Check-in participation). This is a self-report prompt, not a label or a score input.")
 
 
@@ -45,7 +45,7 @@ def render_directory(ctx):
     st.subheader("Student Directory")
     df = pd.DataFrame(db.list_students(user))
     if df.empty:
-        st.info("No students found.")
+        st.caption("No students found.")
         return
     f1, f2, f3, f4 = st.columns(4)
     q = f1.text_input("Search ID / name")
@@ -67,13 +67,13 @@ def render_directory(ctx):
     st.dataframe(view[["student_id", "alias", "program", "year", "zone", "risk_value", "assessed_at", "self-report flag", "synthetic"]],
                  hide_index=True, width="stretch")
     if view.empty:
-        st.info("No students match these filters.")
+        st.caption("No students match these filters.")
         return
     sid = st.selectbox("Open student profile", view["student_id"].tolist(),
                        format_func=lambda s: f"{s} — {view.set_index('student_id').loc[s, 'alias']}")
     hist = db.get_assessments(user, sid)
     if not hist:
-        st.info("This student has no assessment yet.")
+        st.caption("This student has no assessment yet.")
         return
     ui.render_assessment(hist[0])
     checks = db.get_checkins(user, sid)
@@ -127,7 +127,7 @@ def render_intervention_centre(ctx):
     students = db.list_students(user)
     ids = [s["student_id"] for s in students if s["zone"]]
     if not ids:
-        st.info("No assessed students yet.")
+        st.caption("No assessed students yet.")
         return
     default = ids.index(st.session_state["selected_student"]) if st.session_state.get("selected_student") in ids else 0
     names = {s["student_id"]: s["alias"] for s in students}

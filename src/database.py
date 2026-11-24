@@ -172,20 +172,25 @@ class Database:
             raise ValueError("Use a password between 8 and 128 characters.")
         if not 1 <= len(display_name) <= 80 or not 1 <= len(program) <= 80 or year not in range(1, 9):
             raise ValueError("Enter a display name, programme and year of study.")
-        digest = hashlib.sha256(code.strip().encode()).hexdigest()
+        if program not in config.PROGRAMS:
+            raise ValueError("Select a programme from the available options.")
+        code = (code or "").strip()
+        digest = hashlib.sha256(code.encode()).hexdigest() if code else None
         try:
             with self.conn() as c:
                 c.execute("BEGIN IMMEDIATE")
-                invite = c.execute(
-                    "SELECT digest FROM student_invites WHERE digest=? AND expires_at>? AND used_by IS NULL",
-                    (digest, now()),
-                ).fetchone()
-                if invite is None:
-                    raise ValueError("This invite is invalid, expired or already used.")
+                if digest is not None:
+                    invite = c.execute(
+                        "SELECT digest FROM student_invites WHERE digest=? AND expires_at>? AND used_by IS NULL",
+                        (digest, now()),
+                    ).fetchone()
+                    if invite is None:
+                        raise ValueError("This invite is invalid, expired or already used.")
                 user_id = self._insert_user(c, username, password, "student", display_name)
                 student_id = f"SG-{user_id}"
                 self.add_student(c, student_id, display_name, program, year, user_id, synthetic=True)
-                c.execute("UPDATE student_invites SET used_by=? WHERE digest=?", (user_id, digest))
+                if digest is not None:
+                    c.execute("UPDATE student_invites SET used_by=? WHERE digest=?", (user_id, digest))
                 user = dict(user_id=user_id, username=username, role="student",
                             display_name=display_name, student_id=student_id)
                 self._audit(c, user, "register_student", "student", student_id)

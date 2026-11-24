@@ -44,7 +44,7 @@ def test_app_launches_to_welcome(tmp_path, monkeypatch):
     assert at.query_params["theme"] == "light"
     click(at, "Enter StudentGuard")
     assert not at.exception
-    assert any("DEMO authentication" in w.value for w in at.warning)
+    assert any("DEMO authentication" in w.value for w in at.caption)
 
 
 @pytest.mark.parametrize("username,password", [
@@ -78,18 +78,18 @@ def test_invite_signup_opens_profile(tmp_path, monkeypatch):
     code = db.create_student_invite(admin)
     click(at, "Enter StudentGuard")
     for label, value in {
-        "Invite code": code, "Display name": "Demo Student",
+        "Invite code (optional)": code, "Display name": "Demo Student",
         "Choose a username": "demo.student", "Choose a password (at least 8 characters)": "demoPass123",
-        "Programme": "Engineering",
     }.items():
         next(widget for widget in at.text_input if widget.label == label).set_value(value)
+    next(w for w in at.selectbox if w.label == "Programme / course").select("Computer Engineering")
     click(at, "Create student account")
     assert not at.exception
     assert any(element.value == "My profile" for element in at.title)
     user = db.authenticate("demo.student", "demoPass123")
     assert user["role"] == "student"
     with pytest.raises(ValueError, match="already used"):
-        db.register_student(code, "another.student", "demoPass123", "Another Demo", "Engineering", 1)
+        db.register_student(code, "another.student", "demoPass123", "Another Demo", "Computer Engineering", 1)
 
 
 @pytest.mark.parametrize("view,fn,user,pw", [
@@ -153,7 +153,7 @@ def test_checkin_lock_message_after_submit(tmp_path):
     survey.submit_checkin(db, db.authenticate("student1", "student123"), CALM, None, True)
     at = run("student_dashboard", "render", "student1", "student123", tmp_path / "l.db")
     assert not at.exception
-    assert any("check-ins open once every" in i.value for i in at.info)
+    assert any("check-ins open once every" in i.value for i in at.caption)
     assert len(at.radio) == 0                                   # form hidden while locked
 
 

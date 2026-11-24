@@ -55,8 +55,8 @@ def main():
         brand.html('<div class="sg-wordmark">STUDENTGUARD AI</div>')
         with appearance:
             theme.toggle()
-        ui.mode_banner(mode)
-        ui.advisory()
+        with st.expander("About StudentGuard"):
+            ui.about(mode)
         if st.session_state.get("sg_screen") == "auth":
             welcome.authentication(db)
         else:
@@ -108,10 +108,8 @@ def main():
             st.session_state["sg_theme"] = appearance
             st.rerun()
         st.divider()
-        st.caption(config.ADVISORY_NOTICE)
-        st.caption("Privacy: access is role-based; private messages are visible only to authorised counsellors.")
-    ui.mode_banner(mode)
-    ui.advisory()
+        with st.expander("About StudentGuard"):
+            ui.about(mode)
     nav.run()
 
 

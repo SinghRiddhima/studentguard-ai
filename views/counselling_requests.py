@@ -8,11 +8,11 @@ from views import ui
 def render(ctx):
     db, user = ctx.db, ctx.user
     st.subheader("SOS Counselling Requests")
-    st.caption("Requests are independent of AI risk zones. This prototype sends no email/SMS — counsellors must check this queue.")
+    st.caption("Requests are independent of AI risk zones. Updates appear in this queue; email/SMS notifications are not sent.")
     choice = st.multiselect("Filter by status", config.SOS_STATUSES, default=["Submitted", "Acknowledged", "Contact in progress", "Session scheduled"])
     reqs = db.list_sos_requests(user, choice or None)
     if not reqs:
-        st.info("No requests match this filter.")
+        st.caption("No requests match this filter.")
         return
     st.write(f"{len(reqs)} request(s)")
     for r in reqs:

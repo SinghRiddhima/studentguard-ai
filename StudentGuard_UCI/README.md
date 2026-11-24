@@ -10,7 +10,7 @@ Extract this ZIP into your studentguard-ai project folder. It contains a
 StudentGuard_UCI subfolder. Open PowerShell in studentguard-ai and run:
 
 ```powershell
-.\.venv\Scripts\python.exe .\StudentGuard_UCI\train_uci.py --data .\StudentGuard_UCI\data\uci_dropout.csv --out .\StudentGuard_UCI\uci_results
+.\.venv\Scripts\python.exe .\StudentGuard_UCI\train_uci.py --data .\StudentGuard_UCI\data\uci_dropout.csv --out .\StudentGuard_UCI_results
 ```
 
 If dependencies are missing, install them in your existing environment:
@@ -20,9 +20,9 @@ If dependencies are missing, install them in your existing environment:
 ```
 
 The script trains locally and saves uci_academic_benchmark.joblib and
-uci_metrics.json under StudentGuard_UCI/uci_results. The supplied results JSON
-is a reference run; rerunning replaces it. No prebuilt model is included:
-training locally avoids pickle compatibility issues between sklearn versions.
+uci_metrics.json under StudentGuard_UCI_results. The app reads this same output folder. A historical reference report remains in
+StudentGuard_UCI/uci_results; it is not the live report. Retrain locally if the
+checked-in model was built with a different scikit-learn version.
 
 ## Experiment design
 - Original data: 4,424 records, 36 features; semicolon-separated CSV.
@@ -66,3 +66,6 @@ UCI Machine Learning Repository. https://doi.org/10.24432/C5MC89
 License: CC BY 4.0 https://creativecommons.org/licenses/by/4.0/
 The bundled source CSV is unchanged. The script performs the documented
 selection and binary target transformation in memory.
+
+The default data and output paths are resolved from the script location, so
+`python StudentGuard_UCI/train_uci.py` works directly from the project root.

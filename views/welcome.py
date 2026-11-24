@@ -1,6 +1,8 @@
 """Public welcome and prototype sign-in."""
 import streamlit as st
 
+import config
+
 from views import ui
 
 ORBITS = """
@@ -42,7 +44,7 @@ def landing():
                 st.markdown(f"**{title}**")
                 st.caption(description)
     if st.session_state.get("sg_discover"):
-        st.info("Students check in, the system highlights possible concerns, and a counsellor reviews suggested support. "
+        st.write("Students check in, the system highlights possible concerns, and a counsellor reviews suggested support. "
                 "Students can also request counselling directly from their profile.")
     st.markdown("**AI supports the decision. People make the difference.**")
     ui.emergency_note()
@@ -56,8 +58,8 @@ def authentication(db):
     with panel:
         st.html(f'<div class="sg-landing" style="grid-template-columns:1fr;min-height:unset">'
                 f'<div><div class="sg-eyebrow">STUDENTGUARD AI</div><h2>Early support starts here.</h2></div>{ORBITS}</div>')
-        st.warning("DEMO authentication. Use fictional information in this classroom prototype.")
         with st.expander("Demo accounts"):
+            st.caption("DEMO authentication. Use fictional information in this classroom prototype.")
             st.table({"Role": ["Student", "Counsellor", "Administrator"],
                       "Username": ["student1", "counsellor", "admin"],
                       "Password": ["student123", "counsel123", "admin123"]})
@@ -75,13 +77,13 @@ def authentication(db):
                         st.rerun()
                     st.error("Invalid username or password.")
         with signup:
-            st.caption("Ask the demo administrator for a one-time student invite.")
+            st.caption("Create a student account. An invite code is optional.")
             with st.form("register"):
-                code = st.text_input("Invite code", type="password")
+                code = st.text_input("Invite code (optional)", type="password", help="Leave blank if you do not have a code.")
                 name = st.text_input("Display name")
                 username = st.text_input("Choose a username")
                 password = st.text_input("Choose a password (at least 8 characters)", type="password")
-                program = st.text_input("Programme", max_chars=80)
+                program = st.selectbox("Programme / course", options=config.PROGRAMS)
                 year = st.number_input("Year of study", min_value=1, max_value=8, step=1)
                 if st.form_submit_button("Create student account", type="primary"):
                     try:

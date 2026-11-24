@@ -17,7 +17,7 @@ def _checkin_tab(ctx):
             st.caption("Some answers were 'not sure / prefer not to say', so neutral values were used for those.")
         return
     if not status["available"]:
-        st.info(f"You completed your check-in on {status['last'][:10]}. To keep this short and useful, check-ins open once every "
+        st.caption(f"You completed your check-in on {status['last'][:10]}. To keep this short and useful, check-ins open once every "
                 f"{config.CHECKIN_INTERVAL_DAYS} days — the next one opens on **{status['available_on']:%d %b %Y}**. "
                 "You can request counselling at any time.")
         return
@@ -93,7 +93,7 @@ def render_sos(ctx, expanded=False):
                 st.error(str(e))
     if st.session_state.get("sos_confirm"):
         st.success(f"✅ Your request was saved. Request ID: **{st.session_state['sos_confirm']}**. "
-                   "A counsellor can view it in their dashboard — you will not get an automatic email/SMS in this prototype; "
+                   "A counsellor can view it in their dashboard. No automatic email/SMS is sent; "
                    "check the status in My Dashboard.")
 
 
@@ -102,7 +102,7 @@ def render(ctx):
     profile = db.get_student(user, user["student_id"])
     st.subheader(f"Welcome, {user['display_name']}")
     if profile and profile["is_synthetic"]:
-        st.info("This is a SYNTHETIC demo student profile — not a real person.")
+        st.caption("Sample student profile")
 
     render_sos(ctx)
 
@@ -113,7 +113,7 @@ def render(ctx):
     with tabs[1]:
         prog = db.progression(user, user["student_id"])
         if not assessments:
-            st.info("Your progress will appear after your first check-in.")
+            st.caption("Your progress will appear after your first check-in.")
         else:
             st.caption("Lower is better. Your counsellor and you can use this to see how things are changing over time.")
             ui.timeline_chart(prog, db.get_thresholds(), key="stud_tl")
@@ -142,7 +142,7 @@ def render(ctx):
                         _feedback_form(db, user, r)
     with tabs[3]:
         if not assessments:
-            st.info("No assessment is available for you yet. Complete the monthly check-in.")
+            st.caption("No assessment is available for you yet. Complete the monthly check-in.")
         else:
             st.caption("An advisory snapshot to help your institution offer support. It is not a prediction that you will leave, "
                        "and it does not affect your access to counselling.")
@@ -155,4 +155,4 @@ def render(ctx):
 - Assessments are advisory; **a human counsellor makes every intervention decision**. Nothing happens automatically (no penalties, no restrictions).
 - Indicators are self-reported patterns, not diagnoses.
 - Feedback you give about services is seen by counsellors; administrators see only averages.
-- Prototype limitation: demo login, local database, no external notifications.""")
+- Request updates are available in My Dashboard; no external notifications are sent.""")

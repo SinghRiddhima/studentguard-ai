@@ -20,7 +20,7 @@ def render(ctx):
     a, b = st.columns(2)
     with a:
         st.markdown("**Risk-zone distribution**")
-        ui.zone_pie(dist) if sum(dist.values()) else st.info("No assessments yet.")
+        ui.zone_pie(dist) if sum(dist.values()) else st.caption("No assessments yet.")
     with b:
         sos = db.sos_stats(user)
         st.markdown("**Counselling requests by status** (counts only)")
@@ -51,7 +51,7 @@ def render(ctx):
                  f"{d['duplicate_rows']} duplicate rows, missing values: {sum(d['missing_values'].values())}. "
                  f"{'**SYNTHETIC** — not real students.' if m['is_synthetic'] else 'Validated labels declared by the trainer.'}")
     else:
-        st.info("No training summary yet. Run `python -m src.train_model`.")
+        st.caption("No training summary yet. Run `python -m src.train_model`.")
     with st.expander("Audit trail (all roles)"):
         counsellor_dashboard.render_audit(ctx)
 
