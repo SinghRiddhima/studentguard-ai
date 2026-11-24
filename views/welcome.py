@@ -1,9 +1,11 @@
-"""Public welcome and prototype sign-in."""
+"""Public welcome, sign-in and student registration."""
+from time import monotonic
+
 import streamlit as st
 
 import config
-
-from views import ui
+from src.contact_verification import LABELS, VerificationError, VerifyService, normalise_contact
+from views import contact_verification, ui
 
 ORBITS = """
 <div class="sg-orbit" aria-hidden="true">
@@ -52,6 +54,7 @@ def landing():
 
 def authentication(db):
     if st.button("Back to welcome"):
+        st.session_state.pop("sg_pending_signup", None)
         st.session_state["sg_screen"] = "welcome"
         st.rerun()
     panel, forms = st.columns([1, 1], gap="large")
@@ -73,23 +76,71 @@ def authentication(db):
                 if st.form_submit_button("Sign in", type="primary"):
                     user = db.authenticate(username, password)
                     if user:
+                        st.session_state.pop("sg_pending_signup", None)
                         st.session_state["user"] = user
                         st.rerun()
                     st.error("Invalid username or password.")
         with signup:
-            st.caption("Create a student account. An invite code is optional.")
-            with st.form("register"):
-                code = st.text_input("Invite code (optional)", type="password", help="Leave blank if you do not have a code.")
-                name = st.text_input("Display name")
-                username = st.text_input("Choose a username")
-                password = st.text_input("Choose a password (at least 8 characters)", type="password")
-                program = st.selectbox("Programme / course", options=config.PROGRAMS)
-                year = st.number_input("Year of study", min_value=1, max_value=8, step=1)
-                if st.form_submit_button("Create student account", type="primary"):
-                    try:
-                        user = db.register_student(code, username, password, name, program, year)
-                    except ValueError as exc:
-                        st.error(str(exc))
-                    else:
-                        st.session_state["user"] = user
-                        st.rerun()
+            render_signup(db)
+
+
+def render_signup(db):
+    try:
+        service = VerifyService.configured()
+    except VerificationError as exc:
+        st.error(str(exc))
+        return
+    pending = st.session_state.get("sg_pending_signup")
+    if pending and (service is None or monotonic() - pending["started"] >= 900):
+        st.session_state.pop("sg_pending_signup")
+        st.caption("Your verification session expired. Enter your details again.")
+        pending = None
+    if pending:
+        st.subheader("Verify your contact details")
+        if st.button("Start sign-up again"):
+            st.session_state.pop("sg_pending_signup")
+            st.rerun()
+        for channel, destination in pending["contacts"].items():
+            if channel in pending["verified"]:
+                st.caption(f"{LABELS[channel]} verified.")
+            elif contact_verification.confirm_code(service, channel, destination, pending["codes"][channel], f"signup_{channel}"):
+                pending["verified"].add(channel)
+                st.rerun()
+        if pending["verified"] == set(LABELS) and st.button("Create student account", type="primary"):
+            try:
+                user = db.complete_registration(pending["registration"], pending["contacts"], pending["verified"])
+            except ValueError as exc:
+                st.error(str(exc))
+            else:
+                st.session_state.pop("sg_pending_signup")
+                st.session_state["user"] = user
+                st.rerun()
+        return
+
+    if service is None:
+        st.caption("Demo sign-up uses fictional contact details. Email and SMS codes are unavailable.")
+    with st.form("register"):
+        code = st.text_input("Invite code (optional)", type="password")
+        name = st.text_input("Display name", max_chars=80)
+        username = st.text_input("Choose a username", max_chars=40)
+        password = st.text_input("Choose a password (at least 8 characters)", type="password", max_chars=128)
+        college_id = st.text_input("College student ID", max_chars=40)
+        program = st.selectbox("Programme / course", options=config.PROGRAMS)
+        year = st.number_input("Year of study", min_value=1, max_value=8, step=1)
+        email = st.text_input("Email address", max_chars=254)
+        phone = st.text_input("Phone number", placeholder="+91…", max_chars=24)
+        label = "Continue to verification" if service else "Create student account"
+        if st.form_submit_button(label, type="primary"):
+            try:
+                contacts = {"email": normalise_contact("email", email), "sms": normalise_contact("sms", phone)}
+                registration = db.prepare_registration(code, username, password, name, program, year, college_id)
+                if service:
+                    st.session_state["sg_pending_signup"] = dict(registration=registration, contacts=contacts,
+                                                                 started=monotonic(), verified=set(),
+                                                                 codes={channel: {} for channel in contacts})
+                else:
+                    st.session_state["user"] = db.complete_registration(registration, contacts)
+            except ValueError as exc:
+                st.error(str(exc))
+            else:
+                st.rerun()

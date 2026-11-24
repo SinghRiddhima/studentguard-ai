@@ -56,14 +56,29 @@ Fresh starts can use a new database and the bundled synthetic data.
 ## Redesigned demo
 
 Open **Enter StudentGuard**, then sign in as `student1` / `student123`, `counsellor` / `counsel123`,
-or `admin` / `admin123`. Each role opens its own **My Profile** page. Profiles support editing
-the display name and uploading or removing a photo. The sidebar links to each role’s existing tools.
+or `admin` / `admin123`. Each role opens **My Profile**. Students can edit their display name,
+username, college-issued student ID, programme, year and photo. Contact details and password have
+their own forms. Existing students can add their college ID while keeping their previous check-ins and counselling records.
 Dark is the default. The theme selector stores its setting in the current URL so a reload can restore it.
 Signing in is scoped to the Streamlit session.
 
-To create a new student, sign in as admin, go to **Settings → Student invitations** and generate
-a code. Then sign out and use the **Student sign-up** tab. A code is valid for one account for 24 hours.
-Use fictional names and images for the classroom demo.
+New students enter their own college ID, email and international-format phone number in **Student sign-up**.
+Invites are optional. Administrators can generate a one-time invite valid for 24 hours under **Settings → Student invitations**.
+
+### Email and phone verification
+
+With a configured [Twilio Verify service](https://www.twilio.com/docs/verify), sign-up requires both an email code and an SMS code.
+For [email delivery](https://www.twilio.com/docs/verify/email), connect a verified SendGrid sender and template to the Verify service.
+Enable SMS delivery to the destination countries you plan to test. Set these environment variables in the server environment before restarting Streamlit.
+
+- `TWILIO_VERIFY_SERVICE_SID` for the Verify service SID
+- `TWILIO_VERIFY_API_KEY` for the Twilio API key SID
+- `TWILIO_VERIFY_API_SECRET` for the Twilio API key secret
+
+For a local demo without those settings, use fictional contact details. They are saved as unverified.
+When changing an already verified contact, the app keeps the current address or number until the replacement is verified.
+Codes confirm access to the email address and phone number. The college ID is self-reported.
+The demo still uses local accounts and published sample credentials. Use institutional authentication before handling real student records.
 
 ## Demo walkthrough (presentation)
 1. Student1 → press **SOS**, submit → note the request ID. 2. Sign out; counsellor → *SOS Requests* → acknowledge → schedule → resolve.

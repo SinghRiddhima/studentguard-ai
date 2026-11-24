@@ -30,7 +30,9 @@ def test_signup_without_invite_opens_profile(tmp_path, monkeypatch):
     at = open_app(tmp_path, monkeypatch)
     click(at, 'Enter StudentGuard')
     for label, value in {'Display name': 'Student Example', 'Choose a username': 'open.student',
-                         'Choose a password (at least 8 characters)': 'password123'}.items():
+                         'Choose a password (at least 8 characters)': 'password123',
+                         'College student ID': 'CE-2026-21', 'Email address': 'open.student@example.com',
+                         'Phone number': '+12025550124'}.items():
         next(w for w in at.text_input if w.label == label).set_value(value)
     next(w for w in at.selectbox if w.label == 'Programme / course').select(config.PROGRAMS[1])
     click(at, 'Create student account')

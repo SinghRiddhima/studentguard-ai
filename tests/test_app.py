@@ -80,6 +80,8 @@ def test_invite_signup_opens_profile(tmp_path, monkeypatch):
     for label, value in {
         "Invite code (optional)": code, "Display name": "Demo Student",
         "Choose a username": "demo.student", "Choose a password (at least 8 characters)": "demoPass123",
+        "College student ID": "CS-2026-07", "Email address": "demo.student@example.com",
+        "Phone number": "+12025550123",
     }.items():
         next(widget for widget in at.text_input if widget.label == label).set_value(value)
     next(w for w in at.selectbox if w.label == "Programme / course").select("Computer Engineering")
@@ -88,6 +90,8 @@ def test_invite_signup_opens_profile(tmp_path, monkeypatch):
     assert any(element.value == "My profile" for element in at.title)
     user = db.authenticate("demo.student", "demoPass123")
     assert user["role"] == "student"
+    assert db.get_student(user, user["student_id"])["college_id"] == "CS-2026-07"
+    assert all(not item["verified_at"] for item in db.own_contacts(user).values())
     with pytest.raises(ValueError, match="already used"):
         db.register_student(code, "another.student", "demoPass123", "Another Demo", "Computer Engineering", 1)
 

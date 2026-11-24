@@ -5,6 +5,7 @@ HERE (not only in the UI). All SQL is parameterised. Counselling messages are on
 counsellors (all) or to the student who wrote them – never to admins or in aggregates."""
 import hashlib
 import json
+import re
 import secrets
 import sqlite3
 from contextlib import contextmanager
@@ -12,6 +13,7 @@ from datetime import datetime, timedelta
 
 import config
 from src.authentication import (hash_password, require_own_student, require_role, verify_password)
+from src.contact_verification import normalise_contact
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
@@ -27,6 +29,11 @@ CREATE TABLE IF NOT EXISTS student_profiles (
   student_id TEXT PRIMARY KEY, user_id INTEGER UNIQUE REFERENCES users(user_id),
   alias TEXT NOT NULL, program TEXT, year INTEGER, is_synthetic INTEGER NOT NULL DEFAULT 0,
   consent_to_assessment INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS student_college_ids (
+  user_id INTEGER PRIMARY KEY REFERENCES users(user_id), college_id TEXT NOT NULL UNIQUE COLLATE NOCASE);
+CREATE TABLE IF NOT EXISTS user_contacts (
+  user_id INTEGER NOT NULL REFERENCES users(user_id), channel TEXT NOT NULL CHECK (channel IN ('email','sms')),
+  destination TEXT NOT NULL, verified_at TEXT, PRIMARY KEY (user_id, channel));
 CREATE TABLE IF NOT EXISTS assessments (
   assessment_id INTEGER PRIMARY KEY AUTOINCREMENT, student_id TEXT NOT NULL REFERENCES student_profiles(student_id),
   assessed_at TEXT NOT NULL, assessed_by INTEGER REFERENCES users(user_id), mode TEXT NOT NULL,
@@ -86,6 +93,25 @@ class CheckInTooSoon(ValueError):
 
 def now() -> str:
     return datetime.now().replace(microsecond=0).isoformat(sep=" ")
+
+
+def normalise_username(username):
+    username = username.strip().lower()
+    if not re.fullmatch(r"[a-z0-9_.-]{3,40}", username):
+        raise ValueError("Use 3–40 letters, numbers, dots, underscores or hyphens for the username.")
+    return username
+
+
+def normalise_college_id(college_id):
+    college_id = college_id.strip()
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9./_ -]{0,39}", college_id):
+        raise ValueError("Enter your college-issued student ID using up to 40 letters, numbers or separators.")
+    return college_id
+
+
+def validate_password(password):
+    if not 8 <= len(password) <= 128:
+        raise ValueError("Use a password between 8 and 128 characters.")
 
 
 class Database:
@@ -162,40 +188,60 @@ class Database:
             self._audit(c, actor, "create_student_invite")
         return code
 
-    def register_student(self, code, username, password, display_name, program, year):
-        username = username.strip().lower()
-        display_name = display_name.strip()
-        program = program.strip()
-        if not 3 <= len(username) <= 40 or not all(ch.isascii() and (ch.isalnum() or ch in "_-.") for ch in username):
-            raise ValueError("Use 3–40 letters, numbers, dots, underscores or hyphens for the username.")
-        if not 8 <= len(password) <= 128:
-            raise ValueError("Use a password between 8 and 128 characters.")
-        if not 1 <= len(display_name) <= 80 or not 1 <= len(program) <= 80 or year not in range(1, 9):
-            raise ValueError("Enter a display name, programme and year of study.")
+    def _validate_registration(self, c, digest, username, display_name, program, year, college_id):
+        if not 1 <= len(display_name) <= 80 or year not in range(1, 9):
+            raise ValueError("Enter a display name and year of study.")
         if program not in config.PROGRAMS:
             raise ValueError("Select a programme from the available options.")
+        if digest and not c.execute(
+            "SELECT 1 FROM student_invites WHERE digest=? AND expires_at>? AND used_by IS NULL", (digest, now()),
+        ).fetchone():
+            raise ValueError("This invite is invalid, expired or already used.")
+        if c.execute("SELECT 1 FROM users WHERE username=?", (username,)).fetchone():
+            raise ValueError("That username already exists.")
+        if college_id and c.execute("SELECT 1 FROM student_college_ids WHERE college_id=?", (college_id,)).fetchone():
+            raise ValueError("That college student ID is already in use.")
+
+    def prepare_registration(self, code, username, password, display_name, program, year, college_id=None):
+        username = normalise_username(username)
+        validate_password(password)
+        display_name = display_name.strip()
+        program = program.strip()
+        if college_id is not None:
+            college_id = normalise_college_id(college_id)
         code = (code or "").strip()
         digest = hashlib.sha256(code.encode()).hexdigest() if code else None
-        try:
-            with self.conn() as c:
-                c.execute("BEGIN IMMEDIATE")
-                if digest is not None:
-                    invite = c.execute(
-                        "SELECT digest FROM student_invites WHERE digest=? AND expires_at>? AND used_by IS NULL",
-                        (digest, now()),
-                    ).fetchone()
-                    if invite is None:
-                        raise ValueError("This invite is invalid, expired or already used.")
-                user_id = self._insert_user(c, username, password, "student", display_name)
-                student_id = f"SG-{user_id}"
-                self.add_student(c, student_id, display_name, program, year, user_id, synthetic=True)
-                if digest is not None:
-                    c.execute("UPDATE student_invites SET used_by=? WHERE digest=?", (user_id, digest))
-                user = dict(user_id=user_id, username=username, role="student",
-                            display_name=display_name, student_id=student_id)
-                self._audit(c, user, "register_student", "student", student_id)
-        except sqlite3.IntegrityError as exc:
-            raise ValueError("That username already exists.") from exc
+        with self.conn() as c:
+            self._validate_registration(c, digest, username, display_name, program, year, college_id)
+        password_hash, salt = hash_password(password)
+        return dict(digest=digest, username=username, display_name=display_name, program=program, year=year,
+                    college_id=college_id, password_hash=password_hash, salt=salt)
+
+    def register_student(self, code, username, password, display_name, program, year):
+        return self.complete_registration(self.prepare_registration(code, username, password, display_name, program, year))
+
+    def complete_registration(self, registration, contacts=None, verified_channels=()):
+        digest, username, display_name, program, year, college_id = (
+            registration[key] for key in ("digest", "username", "display_name", "program", "year", "college_id")
+        )
+        with self.conn() as c:
+            c.execute("BEGIN IMMEDIATE")
+            self._validate_registration(c, digest, username, display_name, program, year, college_id)
+            user_id = c.execute(
+                "INSERT INTO users(username,password_hash,salt,role,display_name,created_at) VALUES (?,?,?,?,?,?)",
+                (username, registration["password_hash"], registration["salt"], "student", display_name, now()),
+            ).lastrowid
+            student_id = f"SG-{user_id}"
+            self.add_student(c, student_id, display_name, program, year, user_id, synthetic=True)
+            if college_id:
+                c.execute("INSERT INTO student_college_ids VALUES (?,?)", (user_id, college_id))
+            for channel, value in (contacts or {}).items():
+                c.execute("INSERT INTO user_contacts VALUES (?,?,?,?)",
+                          (user_id, channel, normalise_contact(channel, value), now() if channel in verified_channels else None))
+            if digest:
+                c.execute("UPDATE student_invites SET used_by=? WHERE digest=?", (user_id, digest))
+            user = dict(user_id=user_id, username=username, role="student", display_name=display_name, student_id=student_id)
+            self._audit(c, user, "register_student", "student", student_id)
         return user
 
     def own_avatar(self, actor):
@@ -203,19 +249,79 @@ class Database:
         rows = self._q("SELECT image FROM user_avatars WHERE user_id=?", (actor["user_id"],))
         return rows[0]["image"] if rows else None
 
-    def update_own_profile(self, actor, display_name, avatar=None, remove_avatar=False):
+    def update_own_profile(self, actor, display_name, avatar=None, remove_avatar=False, *,
+                           username=None, college_id=None, program=None, year=None):
         require_role(actor, "student", "counsellor", "admin")
         display_name = display_name.strip()
         if not 1 <= len(display_name) <= 80:
             raise ValueError("Enter a display name between 1 and 80 characters.")
+        if username is not None:
+            username = normalise_username(username)
+        student = actor["role"] == "student"
+        if college_id is not None:
+            require_role(actor, "student")
+            college_id = normalise_college_id(college_id)
+        if ((program is not None and program not in config.PROGRAMS)
+                or (year is not None and year not in range(1, 9))):
+            raise ValueError("Select a programme and a valid year of study.")
         with self.conn() as c:
-            c.execute("UPDATE users SET display_name=? WHERE user_id=?", (display_name, actor["user_id"]))
+            c.execute("BEGIN IMMEDIATE")
+            uid = actor["user_id"]
+            if username and c.execute("SELECT 1 FROM users WHERE username=? AND user_id!=?", (username, uid)).fetchone():
+                raise ValueError("That username already exists.")
+            if college_id and c.execute("SELECT 1 FROM student_college_ids WHERE college_id=? AND user_id!=?",
+                                        (college_id, uid)).fetchone():
+                raise ValueError("That college student ID is already in use.")
+            c.execute("UPDATE users SET display_name=?,username=COALESCE(?,username) WHERE user_id=?",
+                      (display_name, username, uid))
+            if student:
+                c.execute("UPDATE student_profiles SET program=COALESCE(?,program),year=COALESCE(?,year) WHERE user_id=?",
+                          (program, year, uid))
+            if college_id:
+                c.execute("INSERT INTO student_college_ids VALUES (?,?) ON CONFLICT(user_id) DO UPDATE SET college_id=excluded.college_id",
+                          (uid, college_id))
             if avatar is not None:
                 c.execute("INSERT INTO user_avatars(user_id,image) VALUES (?,?) "
                           "ON CONFLICT(user_id) DO UPDATE SET image=excluded.image", (actor["user_id"], avatar))
             elif remove_avatar:
                 c.execute("DELETE FROM user_avatars WHERE user_id=?", (actor["user_id"],))
             self._audit(c, actor, "update_profile", "user", actor["user_id"])
+
+    def own_contacts(self, actor):
+        require_role(actor, "student", "counsellor", "admin")
+        return {row["channel"]: row for row in self._q(
+            "SELECT channel,destination,verified_at FROM user_contacts WHERE user_id=?", (actor["user_id"],),
+        )}
+
+    def save_own_contact(self, actor, channel, destination, verified, previous):
+        require_role(actor, "student", "counsellor", "admin")
+        destination = normalise_contact(channel, destination)
+        with self.conn() as c:
+            c.execute("BEGIN IMMEDIATE")
+            uid = actor["user_id"]
+            current = c.execute("SELECT destination,verified_at FROM user_contacts WHERE user_id=? AND channel=?",
+                                (uid, channel)).fetchone()
+            if (current["destination"] if current else None) != previous:
+                raise ValueError("This contact has changed. Reopen the form and try again.")
+            if not verified and current and current["verified_at"]:
+                raise ValueError("Verify the new contact before replacing the existing one.")
+            c.execute("INSERT INTO user_contacts VALUES (?,?,?,?) ON CONFLICT(user_id,channel) DO UPDATE "
+                      "SET destination=excluded.destination,verified_at=excluded.verified_at",
+                      (uid, channel, destination, now() if verified else None))
+            self._audit(c, actor, "update_contact", "user", uid, {"channel": channel, "verified": verified})
+
+    def change_own_password(self, actor, current_password, new_password):
+        require_role(actor, "student", "counsellor", "admin")
+        validate_password(new_password)
+        with self.conn() as c:
+            c.execute("BEGIN IMMEDIATE")
+            uid = actor["user_id"]
+            row = c.execute("SELECT password_hash,salt FROM users WHERE user_id=? AND is_active=1", (uid,)).fetchone()
+            if not row or not verify_password(current_password, row["password_hash"], row["salt"]):
+                raise ValueError("The current password is incorrect.")
+            digest, salt = hash_password(new_password)
+            c.execute("UPDATE users SET password_hash=?,salt=? WHERE user_id=?", (digest, salt, uid))
+            self._audit(c, actor, "change_password", "user", uid)
 
     def create_user(self, actor, username, password, role, display_name):
         require_role(actor, "admin")
@@ -252,8 +358,9 @@ class Database:
 
     def list_students(self, actor):
         require_role(actor, "counsellor")
-        return self._q("""SELECT p.student_id,p.alias,p.program,p.year,p.is_synthetic,(SELECT intent_flag FROM survey_responses s WHERE s.student_id=p.student_id ORDER BY s.response_id DESC LIMIT 1) AS intent_flag,a.zone,a.risk_value,a.assessed_at,a.mode
-            FROM student_profiles p LEFT JOIN assessments a ON a.assessment_id =
+        return self._q("""SELECT p.student_id,i.college_id,p.alias,p.program,p.year,p.is_synthetic,(SELECT intent_flag FROM survey_responses s WHERE s.student_id=p.student_id ORDER BY s.response_id DESC LIMIT 1) AS intent_flag,a.zone,a.risk_value,a.assessed_at,a.mode
+            FROM student_profiles p LEFT JOIN student_college_ids i ON i.user_id=p.user_id
+            LEFT JOIN assessments a ON a.assessment_id =
               (SELECT MAX(assessment_id) FROM assessments WHERE student_id=p.student_id)
             ORDER BY p.student_id""")
 
@@ -262,8 +369,9 @@ class Database:
             require_own_student(actor, student_id)
         else:
             require_role(actor, "counsellor")
-        r = self._q("SELECT student_id,alias,program,year,is_synthetic,consent_to_assessment FROM student_profiles "
-                    "WHERE student_id=?", (student_id,))
+        r = self._q("SELECT p.student_id,p.alias,p.program,p.year,p.is_synthetic,p.consent_to_assessment,i.college_id "
+                    "FROM student_profiles p LEFT JOIN student_college_ids i ON i.user_id=p.user_id "
+                    "WHERE p.student_id=?", (student_id,))
         return r[0] if r else None
 
     # ---------------- assessments ----------------

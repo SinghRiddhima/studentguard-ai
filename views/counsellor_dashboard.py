@@ -53,9 +53,11 @@ def render_directory(ctx):
     progs = f3.multiselect("Program", sorted(df["program"].dropna().unique()))
     years = f4.multiselect("Year", sorted(df["year"].dropna().unique()))
     view = df.copy()
+    view["Student ID"] = view["college_id"].fillna(view["student_id"])
     view["zone"] = view["zone"].fillna("NONE")
     if q:
-        view = view[view["student_id"].str.contains(q, case=False) | view["alias"].str.contains(q, case=False)]
+        view = view[view["Student ID"].str.contains(q, case=False, regex=False)
+                    | view["alias"].str.contains(q, case=False, regex=False)]
     view = view[view["zone"].isin(zones + ["NONE"])]
     if progs:
         view = view[view["program"].isin(progs)]
@@ -64,13 +66,13 @@ def render_directory(ctx):
     view["synthetic"] = view["is_synthetic"].map({1: "SYNTHETIC", 0: "real"})
     view["self-report flag"] = view["intent_flag"].map({1: "⚑", 0: ""}).fillna("")
     st.caption(f"{len(view)} of {len(df)} students")
-    st.dataframe(view[["student_id", "alias", "program", "year", "zone", "risk_value", "assessed_at", "self-report flag", "synthetic"]],
+    st.dataframe(view[["Student ID", "alias", "program", "year", "zone", "risk_value", "assessed_at", "self-report flag", "synthetic"]],
                  hide_index=True, width="stretch")
     if view.empty:
         st.caption("No students match these filters.")
         return
-    sid = st.selectbox("Open student profile", view["student_id"].tolist(),
-                       format_func=lambda s: f"{s} — {view.set_index('student_id').loc[s, 'alias']}")
+    labels = dict(zip(view["student_id"], view["Student ID"] + " — " + view["alias"]))
+    sid = st.selectbox("Open student profile", list(labels), format_func=labels.get)
     hist = db.get_assessments(user, sid)
     if not hist:
         st.caption("This student has no assessment yet.")
