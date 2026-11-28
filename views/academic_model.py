@@ -68,30 +68,34 @@ def render(ctx):
     st.caption(f'Selected using training cross-validation: {selected}. '
                f"Training records: {metadata.get('train_rows', '?')}; "
                f"test records: {metadata.get('test_rows', '?')}.")
+    selected_test = metadata.get('results', {}).get(selected, {}).get('test', {})
+    if 'f1' in selected_test and 'recall' in selected_test:
+        st.markdown(f"**{selected}** achieved **{selected_test['f1']:.3f} dropout F1** "
+                    f"and identified **{selected_test['recall']:.1%} of recorded dropout cases** "
+                    "in the held-out set.")
     rows = []
     for name, result in metadata.get('results', {}).items():
         test = result.get('test', {})
         rows.append({'Model': name, **{metric.title(): round(test[metric], 3)
                                      for metric in ('accuracy', 'precision', 'recall', 'f1') if metric in test}})
     if rows:
-        st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+        st.dataframe(pd.DataFrame(rows), hide_index=True, width='stretch')
     st.caption('Positive class = Dropout. Enrolled records were excluded because their final '
                'outcomes were unresolved; the comparison is Dropout versus Graduate only.')
-    with st.expander('Dataset counts and prediction errors', expanded=True):
+    with st.expander('Dataset counts and prediction errors'):
         counts = metadata.get('source_class_counts', {})
         if counts:
             st.dataframe(pd.DataFrame([
                 {'Recorded outcome': label, 'Records': count,
                  'Used for training/testing': label != 'Enrolled'}
                 for label, count in counts.items()
-            ]), hide_index=True, use_container_width=True)
-        result = metadata.get('results', {}).get(selected, {}).get('test', {})
-        matrix = result.get('confusion_matrix')
+            ]), hide_index=True, width='stretch')
+        matrix = selected_test.get('confusion_matrix')
         if matrix is not None:
             st.write(f'Confusion matrix — {selected}')
             st.dataframe(pd.DataFrame(matrix,
                 index=['Actually Graduate', 'Actually Dropout'],
-                columns=['Predicted Graduate', 'Predicted Dropout']), use_container_width=True)
+                columns=['Predicted Graduate', 'Predicted Dropout']), width='stretch')
             tn, fp = matrix[0]
             fn, tp = matrix[1]
             st.caption(f'{tp} dropout cases identified; {fn} missed. '
